@@ -17,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -85,6 +86,32 @@ type ErrorResponse struct {
 	Status     int         `json:"status"`
 	Message    string      `json:"message"`
 	ResponseDg interface{} `json:"response_digi_flazz"`
+}
+
+type DigiflazzCekHargaAll struct {
+	Data []struct {
+		ProductName         string `json:"product_name"`
+		Category            string `json:"category"`
+		Brand               string `json:"brand"`
+		Type                string `json:"type"`
+		SellerName          string `json:"seller_name"`
+		Price               int    `json:"price"`
+		BuyerSkuCode        string `json:"buyer_sku_code"`
+		BuyerProductStatus  bool   `json:"buyer_product_status"`
+		SellerProductStatus bool   `json:"seller_product_status"`
+		UnlimitedStock      bool   `json:"unlimited_stock"`
+		Stock               int    `json:"stock"`
+		Multi               bool   `json:"multi"`
+		StartCutOff         string `json:"start_cut_off"`
+		EndCutOff           string `json:"end_cut_off"`
+		Desc                string `json:"desc"`
+	} `json:"data"`
+}
+
+type RequestDigiflazzCekhargaALl struct {
+	Cmd      string `json:"cmd"`
+	Username string `json:"username"`
+	Sign     string `json:"sign"`
 }
 
 func orderManual(w http.ResponseWriter, r *http.Request) {
@@ -216,6 +243,72 @@ func HitDigiflazz(order Order) (httpStatus int, dg ResponseDigiflazz, err error)
 	return resp.StatusCode, dg, err
 }
 
+func HitDigiflazzCekHarga() (httpStatus int, dg DigiflazzCekHargaAll, err error) {
+	fmt.Println("Calling API...")
+
+	dgCekHarga := RequestDigiflazzCekhargaALl{
+		Cmd:      "prepaid",
+		Username: "hubugeo6zxQo",
+		Sign:     "a3df5cc72ec57829542281f12a12d071",
+	}
+
+	reqPartnerValidity, err := json.Marshal(dgCekHarga)
+	if err != nil {
+		fmt.Print(err.Error())
+		return
+	}
+	bodyJson := string(reqPartnerValidity)
+	var ioreader io.Reader
+	if bodyJson != "" {
+		ioreader = bytes.NewBuffer([]byte(bodyJson))
+	}
+	req, err := http.NewRequest("POST", "https://api.digiflazz.com/v1/price-list", ioreader)
+	if err != nil {
+		fmt.Print(err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Print(err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Print(err.Error())
+		return
+	}
+	var responseObject DigiflazzCekHargaAll
+	json.Unmarshal(bodyBytes, &responseObject)
+	dg = responseObject
+	return resp.StatusCode, dg, err
+}
+
+func cekHargaDigiflazzAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	code, response, err := HitDigiflazzCekHarga()
+	if err != nil {
+		var errResponse ErrorResponse
+		errResponse.Status = code
+		errResponse.Message = err.Error()
+		errResponse.ResponseDg = response
+		json.NewEncoder(w).Encode(&errResponse)
+		return
+	}
+	if code != 200 {
+		var errResponse ErrorResponse
+		errResponse.Status = code
+		errResponse.Message = err.Error()
+		errResponse.ResponseDg = response
+		json.NewEncoder(w).Encode(&errResponse)
+		return
+	}
+	json.NewEncoder(w).Encode(&response)
+	return
+}
+
 func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	privateKey := r.Header.Get("private_key")
@@ -244,14 +337,14 @@ func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 	if code != 200 {
 		var errResponse ErrorResponse
 		errResponse.Status = code
-		errResponse.Message = err.Error()
+		errResponse.Message = response.Message
 		errResponse.ResponseDg = response
 		json.NewEncoder(w).Encode(&errResponse)
 		return
 	}
 	if response.Success == true {
 		numberOfOrder := len(response.Data)
-		url := "https://api.callmebot.com/whatsapp.php?phone=6281291755506&text=Ada+" + cast.ToString(numberOfOrder) + "+pesanan+baru+itemku&apikey=" + os.Getenv("API_KEY_WHATSAPP")
+		url := "https://api.callmebot.com/whatsapp.php?phone=" + os.Getenv("NUMBER_WHATSAPP") + "&text=Ada+" + cast.ToString(numberOfOrder) + "+pesanan+baru+itemku&apikey=" + os.Getenv("API_KEY_WHATSAPP")
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			fmt.Print(err.Error())
@@ -261,11 +354,36 @@ func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Print(err.Error())
 		}
+
 		defer resp.Body.Close()
+		go sendAlertToWhatsapp(response)
 	}
 	json.NewEncoder(w).Encode(&response)
 	return
 
+}
+
+func sendAlertToWhatsapp(response PesananItemkuResponse) {
+	for _, responseDataPesanan := range response.Data {
+		reqPartnerValidity, err := json.Marshal(responseDataPesanan)
+		if err != nil {
+			fmt.Print(err.Error())
+			return
+		}
+		bodyJson := string(reqPartnerValidity)
+		url := "https://api.callmebot.com/whatsapp.php?phone=" + os.Getenv("NUMBER_WHATSAPP") + "&text=" + strings.ReplaceAll(bodyJson, " ", "+") + "&apikey=" + os.Getenv("API_KEY_WHATSAPP")
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+
+		defer resp.Body.Close()
+	}
 }
 
 func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, respPI PesananItemkuResponse, err error) {
@@ -283,7 +401,6 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	}
 
 	tokenBearer, err := generateJwtItemku("VFF_JLdc3Wnk5shcO3Du", cast.ToString(nonce.Unix()), requestItemku)
-	fmt.Println(tokenBearer)
 	req, err := http.NewRequest("POST", "https://tokoku-gateway.itemku.com/api/order/list", ioreader)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -294,8 +411,6 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	req.Header.Set("X-Api-Key", "VFF_JLdc3Wnk5shcO3Du")
 	req.Header.Set("Nonce", cast.ToString(nonce.Unix()))
 	req.Header.Set("Authorization", "Bearer "+tokenBearer)
-	fmt.Println(req.Header)
-	fmt.Println(req.Body)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -310,7 +425,6 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	}
 	var responseObject PesananItemkuResponse
 	json.Unmarshal(bodyBytes, &responseObject)
-	fmt.Printf("API Response as struct %+v\n", responseObject)
 	respPI = responseObject
 	return resp.StatusCode, respPI, err
 }
@@ -360,6 +474,7 @@ func main() {
 	r.HandleFunc("/digiflazz/pembayaran", pembayaran).Methods("POST")
 	r.HandleFunc("/digiflazz/cek", cekTagihan).Methods("POST")
 	r.HandleFunc("/digiflazz/manual-pembayaran", orderManual).Methods("POST")
+	r.HandleFunc("/digiflazz/cek_harga", cekHargaDigiflazzAll).Methods("GET")
 
 	r.HandleFunc("/itemku/pesanan/cek", cekPesananItemku).Methods("POST")
 
