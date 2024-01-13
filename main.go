@@ -5,14 +5,13 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/golang-module/carbon/v2"
 	"github.com/gorilla/mux"
-	"github.com/jasonlvhit/gocron"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cast"
 	"io"
 	"io/ioutil"
@@ -406,9 +405,6 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 		return
 	}
 	defer resp.Body.Close()
-	if httpStatus != 200 {
-		return httpStatus, respPI, errors.New("Response status bukan 200")
-	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -465,6 +461,19 @@ func SendMsgTelegram(text string, bot string, chat_id string) {
 
 }
 
+func startScheduler() {
+	// set scheduler berdasarkan zona waktu sesuai kebutuhan
+	jakartaTime, _ := time.LoadLocation("Asia/Jakarta")
+	scheduler := cron.New(cron.WithLocation(jakartaTime))
+
+	// stop scheduler tepat sebelum fungsi berakhir
+	defer scheduler.Stop()
+
+	scheduler.AddFunc("* * * * *", cekPesananItemkuService)
+	// start scheduler
+	go scheduler.Start()
+}
+
 // Main function
 func main() {
 	fmt.Println("mulai")
@@ -481,8 +490,7 @@ func main() {
 		fmt.Printf("Error assigning configUrl from .env : %v", err)
 		panic(err)
 	}
-	gocron.Every(1).Minute().Do(cekPesananItemkuService)
-
+	startScheduler()
 	SendMsgTelegram("Backend Wongkito Jalan", os.Getenv("TELEGRAM_BOT_API_KEY"), "1177093211")
 
 	// Init router
