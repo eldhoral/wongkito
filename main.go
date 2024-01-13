@@ -5,10 +5,12 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/golang-module/carbon/v2"
 	"github.com/gorilla/mux"
+	"github.com/jasonlvhit/gocron"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/spf13/cast"
@@ -343,27 +345,24 @@ func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if response.Success == true {
-		numberOfOrder := len(response.Data)
-		url := "https://api.callmebot.com/whatsapp.php?phone=" + os.Getenv("NUMBER_WHATSAPP") + "&text=Ada+" + cast.ToString(numberOfOrder) + "+pesanan+baru+itemku&apikey=" + os.Getenv("API_KEY_WHATSAPP")
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-
-		defer resp.Body.Close()
-		go sendAlertToWhatsapp(response)
+		go sendAlertToTelegram(response)
 	}
 	json.NewEncoder(w).Encode(&response)
 	return
 
 }
 
-func sendAlertToWhatsapp(response PesananItemkuResponse) {
+func cekPesananItemkuService() {
+	requestPesanan := PesananItemkuRequest{DateStart: carbon.Yesterday().ToDateString(), OrderStatus: "REQUIRE_PROCESS"}
+	code, _, err := hitItemkuOrderList(requestPesanan)
+	if err != nil || code != 200 {
+		SendMsgTelegram(fmt.Sprintf("Gagal cek pesanan itemku. Lihat log ini : %v || dan status code ini : %d. Segera perbaiki!!!", err, code), os.Getenv("TELEGRAM_BOT_API_KEY"), "1177093211")
+	}
+}
+
+func sendAlertToTelegram(response PesananItemkuResponse) {
+	numberOfOrder := len(response.Data)
+	SendMsgTelegram(fmt.Sprintf("Ada %d pesanan di itemku. Segera di check!", numberOfOrder), os.Getenv("TELEGRAM_BOT_API_KEY"), "1177093211")
 	for _, responseDataPesanan := range response.Data {
 		reqPartnerValidity, err := json.Marshal(responseDataPesanan)
 		if err != nil {
@@ -371,18 +370,7 @@ func sendAlertToWhatsapp(response PesananItemkuResponse) {
 			return
 		}
 		bodyJson := string(reqPartnerValidity)
-		url := "https://api.callmebot.com/whatsapp.php?phone=" + os.Getenv("NUMBER_WHATSAPP") + "&text=" + strings.ReplaceAll(bodyJson, " ", "+") + "&apikey=" + os.Getenv("API_KEY_WHATSAPP")
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-
-		defer resp.Body.Close()
+		SendMsgTelegram(strings.ReplaceAll(bodyJson, " ", "+"), os.Getenv("TELEGRAM_BOT_API_KEY"), "1177093211")
 	}
 }
 
@@ -418,6 +406,9 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 		return
 	}
 	defer resp.Body.Close()
+	if httpStatus != 200 {
+		return httpStatus, respPI, errors.New("Response status bukan 200")
+	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -451,6 +442,29 @@ func generateJwtItemku(xApiKey, Nonce string, requestBody PesananItemkuRequest) 
 	return tokenString, nil
 }
 
+func SendMsgTelegram(text string, bot string, chat_id string) {
+
+	request_url := "https://api.telegram.org/" + bot + "/sendMessage"
+
+	client := &http.Client{}
+
+	values := map[string]string{"text": text, "chat_id": chat_id}
+	json_paramaters, _ := json.Marshal(values)
+
+	req, _ := http.NewRequest("POST", request_url, bytes.NewBuffer(json_paramaters))
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(res.Status)
+		defer res.Body.Close()
+	}
+
+}
+
 // Main function
 func main() {
 	fmt.Println("mulai")
@@ -467,6 +481,9 @@ func main() {
 		fmt.Printf("Error assigning configUrl from .env : %v", err)
 		panic(err)
 	}
+	gocron.Every(1).Minute().Do(cekPesananItemkuService)
+
+	SendMsgTelegram("Backend Wongkito Jalan", os.Getenv("TELEGRAM_BOT_API_KEY"), "1177093211")
 
 	// Init router
 	r := mux.NewRouter()
