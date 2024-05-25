@@ -7,10 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang-module/carbon/v2"
 	"io"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/golang-module/carbon/v2"
 )
 
 func HitDigiflazz(order Order) (httpStatus int, dg ResponseDigiflazz, err error) {
@@ -129,9 +130,9 @@ func pembayaran(w http.ResponseWriter, r *http.Request) {
 	}
 	orders = append(orders, order)
 	json.NewEncoder(w).Encode(&response)
-	go func() {
-		err = Wr.Repository.InsertPaymentDigiflazz(response)
-	}()
+	//go func() {
+	//	err = Wr.Repository.InsertPaymentDigiflazz(response)
+	//}()
 }
 
 func cekTagihan(w http.ResponseWriter, r *http.Request) {

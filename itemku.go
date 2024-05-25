@@ -82,7 +82,81 @@ func generateJwtItemku(xApiKey, Nonce string, requestBody PesananItemkuRequest) 
 
 	return tokenString, nil
 }
+
+func generateJwtItemkuForDeliverProduct(xApiKey, Nonce string, requestBody OrderItemkuRequest) (tokenString string, err error) {
+	tokenJwt := jwt.Token{
+		Header: map[string]interface{}{
+			"X-Api-Key": xApiKey,
+			"Nonce":     Nonce,
+			"alg":       "HS256",
+		},
+		Claims: jwt.MapClaims{
+			"order_id":      requestBody.OrderID,
+			"action":        requestBody.Action,
+			"delivery_info": requestBody.DeliveryInfo,
+		},
+		Method: jwt.SigningMethodHS256,
+	}
+	var secretKey = []byte("q0lo9uaXexfLZiQBkLO6iGh1G7gI-BjPrdSZeBoZ")
+	tokenString, err = tokenJwt.SignedString(secretKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
 func hitItemkuDeliverProduct(respPI PesananItemkuResponse) (err error) {
+	if respPI.Success != true {
+		return nil
+	}
+	for _, dataPesanan := range respPI.Data {
+		deliveryInfoModel := DeliveryInfo{
+			UsingDeliveryInfo: false,
+			DeliveryInfoField: nil,
+		}
+		deliveryInfo := make([]DeliveryInfo, 0)
+		deliveryInfo = append(deliveryInfo, deliveryInfoModel)
+
+		request := OrderItemkuRequest{
+			OrderID:      dataPesanan.OrderID,
+			Action:       "DELIVER",
+			DeliveryInfo: deliveryInfo,
+		}
+
+		nonce := time.Now()
+
+		resultMarshal, err := json.Marshal(request)
+		if err != nil {
+			fmt.Println(err.Error())
+			return nil
+		}
+		bodyJson := string(resultMarshal)
+		var ioreader io.Reader
+		if bodyJson != "" {
+			ioreader = bytes.NewBuffer([]byte(bodyJson))
+		}
+
+		tokenBearer, err := generateJwtItemkuForDeliverProduct("VFF_JLdc3Wnk5shcO3Du", cast.ToString(nonce.Unix()), request)
+		req, err := http.NewRequest("POST", "https://tokoku-gateway.itemku.com/api/order/action", ioreader)
+		if err != nil {
+			fmt.Println(err.Error())
+			return nil
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", "VFF_JLdc3Wnk5shcO3Du")
+		req.Header.Set("Nonce", cast.ToString(nonce.Unix()))
+		req.Header.Set("Authorization", "Bearer "+tokenBearer)
+		client := &http.Client{}
+		responseItemku, err := client.Do(req)
+		fmt.Println(responseItemku)
+		if err != nil {
+			fmt.Println(err.Error())
+			return nil
+		}
+	}
+
 	return
 }
 
@@ -120,6 +194,7 @@ func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if response.Success == true {
+		_ = hitItemkuDeliverProduct(response)
 		go sendAlertToTelegram(response)
 	}
 	json.NewEncoder(w).Encode(&response)
@@ -157,6 +232,7 @@ func clearString(str string) string {
 }
 
 func cekPesananItemkuService() {
+	fmt.Println(time.Now())
 	fmt.Println("run cekPesananItemkuService")
 	requestPesanan := PesananItemkuRequest{DateStart: carbon.Yesterday().ToDateString(), OrderStatus: "REQUIRE_PROCESS"}
 	code, _, err := hitItemkuOrderList(requestPesanan)

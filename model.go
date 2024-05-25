@@ -28,6 +28,16 @@ type PesananItemkuRequest struct {
 	OrderStatus string `json:"order_status"`
 }
 
+type OrderItemkuRequest struct {
+	OrderID      int            `json:"order_id"`
+	Action       string         `json:"action"`
+	DeliveryInfo []DeliveryInfo `json:"delivery_info"`
+}
+type DeliveryInfo struct {
+	UsingDeliveryInfo bool    `json:"using_delivery_info"`
+	DeliveryInfoField *string `json:"delivery_info_field"`
+}
+
 type DataPesananItemkuResponse struct {
 	OrderID             int    `json:"order_id"`
 	OrderNumber         string `json:"order_number"`
