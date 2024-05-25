@@ -29,9 +29,9 @@ type PesananItemkuRequest struct {
 }
 
 type OrderItemkuRequest struct {
-	OrderID      int            `json:"order_id"`
 	Action       string         `json:"action"`
 	DeliveryInfo []DeliveryInfo `json:"delivery_info"`
+	OrderID      int            `json:"order_id"`
 }
 type DeliveryInfo struct {
 	UsingDeliveryInfo bool    `json:"using_delivery_info"`

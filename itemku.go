@@ -43,7 +43,9 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	req.Header.Set("X-Api-Key", "VFF_JLdc3Wnk5shcO3Du")
 	req.Header.Set("Nonce", cast.ToString(nonce.Unix()))
 	req.Header.Set("Authorization", "Bearer "+tokenBearer)
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -60,8 +62,9 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	respPI = responseObject
 	fmt.Println(respPI)
 	if respPI.Success == true {
-		_ = hitItemkuDeliverProduct(respPI)
 		go sendAlertToTelegram(respPI)
+		_ = hitItemkuDeliverProduct(respPI)
+
 	}
 	return resp.StatusCode, respPI, err
 }
@@ -96,9 +99,9 @@ func generateJwtItemkuForDeliverProduct(xApiKey, Nonce string, requestBody Order
 			"alg":       "HS256",
 		},
 		Claims: jwt.MapClaims{
-			"order_id":      requestBody.OrderID,
 			"action":        requestBody.Action,
 			"delivery_info": requestBody.DeliveryInfo,
+			"order_id":      requestBody.OrderID,
 		},
 		Method: jwt.SigningMethodHS256,
 	}
@@ -155,11 +158,20 @@ func hitItemkuDeliverProduct(respPI PesananItemkuResponse) (err error) {
 		req.Header.Set("Authorization", "Bearer "+tokenBearer)
 		client := &http.Client{}
 		responseItemku, err := client.Do(req)
-		fmt.Println(responseItemku)
 		if err != nil {
 			fmt.Println(err.Error())
 			return nil
 		}
+		defer responseItemku.Body.Close()
+		bodyBytes, err := ioutil.ReadAll(responseItemku.Body)
+		if err != nil {
+			fmt.Println(err.Error())
+			return nil
+		}
+		var responseObject PesananItemkuResponse
+		json.Unmarshal(bodyBytes, &responseObject)
+		fmt.Println(responseObject)
+		sendAlertToTelegram(responseObject)
 	}
 
 	return
