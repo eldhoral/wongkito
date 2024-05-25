@@ -58,6 +58,11 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	var responseObject PesananItemkuResponse
 	json.Unmarshal(bodyBytes, &responseObject)
 	respPI = responseObject
+	fmt.Println(respPI)
+	if respPI.Success == true {
+		_ = hitItemkuDeliverProduct(respPI)
+		go sendAlertToTelegram(respPI)
+	}
 	return resp.StatusCode, respPI, err
 }
 
@@ -193,10 +198,10 @@ func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&errResponse)
 		return
 	}
-	if response.Success == true {
-		_ = hitItemkuDeliverProduct(response)
-		go sendAlertToTelegram(response)
-	}
+	//if response.Success == true {
+	//	_ = hitItemkuDeliverProduct(response)
+	//	go sendAlertToTelegram(response)
+	//}
 	json.NewEncoder(w).Encode(&response)
 	//go func() {
 	//	if len(response.Data) != 0 {
