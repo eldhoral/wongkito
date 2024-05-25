@@ -6,15 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/golang-module/carbon/v2"
-	"github.com/spf13/cast"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang-module/carbon/v2"
+	"github.com/spf13/cast"
 )
 
 func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, respPI PesananItemkuResponse, err error) {
@@ -81,6 +82,9 @@ func generateJwtItemku(xApiKey, Nonce string, requestBody PesananItemkuRequest) 
 
 	return tokenString, nil
 }
+func hitItemkuDeliverProduct(respPI PesananItemkuResponse) (err error) {
+	return
+}
 
 func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -119,30 +123,30 @@ func cekPesananItemku(w http.ResponseWriter, r *http.Request) {
 		go sendAlertToTelegram(response)
 	}
 	json.NewEncoder(w).Encode(&response)
-	go func() {
-		if len(response.Data) != 0 {
-			for i, _ := range response.Data {
-				x := map[string]string{}
-				err = json.Unmarshal([]byte(response.Data[i].RequiredInformation), &x)
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				x["username"] = clearString(x["username"])
-				jsonStr, err := json.Marshal(x)
-				if err != nil {
-					fmt.Printf("Error: %s", err.Error())
-				}
-				response.Data[i].RequiredInformation = string(jsonStr)
-			}
-			err = Wr.Repository.InsertOrderItemku(response.Data)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}
-
-	}()
+	//go func() {
+	//	if len(response.Data) != 0 {
+	//		for i, _ := range response.Data {
+	//			x := map[string]string{}
+	//			err = json.Unmarshal([]byte(response.Data[i].RequiredInformation), &x)
+	//			if err != nil {
+	//				fmt.Println(err)
+	//				continue
+	//			}
+	//			x["username"] = clearString(x["username"])
+	//			jsonStr, err := json.Marshal(x)
+	//			if err != nil {
+	//				fmt.Printf("Error: %s", err.Error())
+	//			}
+	//			response.Data[i].RequiredInformation = string(jsonStr)
+	//		}
+	//		err = Wr.Repository.InsertOrderItemku(response.Data)
+	//		if err != nil {
+	//			fmt.Println(err)
+	//			return
+	//		}
+	//	}
+	//
+	//}()
 	return
 
 }
@@ -153,6 +157,7 @@ func clearString(str string) string {
 }
 
 func cekPesananItemkuService() {
+	fmt.Print("run cekPesananItemkuService")
 	requestPesanan := PesananItemkuRequest{DateStart: carbon.Yesterday().ToDateString(), OrderStatus: "REQUIRE_PROCESS"}
 	code, _, err := hitItemkuOrderList(requestPesanan)
 	if err != nil || code != 200 {

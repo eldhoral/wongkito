@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/robfig/cron/v3"
-	"gorm.io/gorm"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	"github.com/kelseyhightower/envconfig"
+	"github.com/robfig/cron/v3"
+	"gorm.io/gorm"
 )
 
 func sendAlertToTelegram(response PesananItemkuResponse) {
@@ -94,16 +95,17 @@ func main() {
 		panic(err)
 	}
 
-	db, err := NewMysqlDatabase(GetMysqlOptionForDWH())
-	if err != nil {
-		fmt.Printf("Cannot connect to db : %v", err)
-		panic(err)
-	}
-
-	Wr = wiringRepository(db)
-	fmt.Println("mulai")
+	//db, err := NewMysqlDatabase(GetMysqlOptionForDWH())
+	//if err != nil {
+	//	fmt.Printf("Cannot connect to db : %v", err)
+	//	panic(err)
+	//}
 
 	startScheduler()
+
+	Wr = wiringRepository(nil)
+	fmt.Println("mulai")
+
 	SendMsgTelegram("Backend Wongkito Jalan", os.Getenv("TELEGRAM_BOT_API_KEY"), "1177093211")
 
 	// Init router
