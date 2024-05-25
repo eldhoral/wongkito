@@ -23,7 +23,7 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 
 	resultMarshal, err := json.Marshal(requestItemku)
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 	bodyJson := string(resultMarshal)
@@ -35,7 +35,7 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	tokenBearer, err := generateJwtItemku("VFF_JLdc3Wnk5shcO3Du", cast.ToString(nonce.Unix()), requestItemku)
 	req, err := http.NewRequest("POST", "https://tokoku-gateway.itemku.com/api/order/list", ioreader)
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 
@@ -46,13 +46,13 @@ func hitItemkuOrderList(requestItemku PesananItemkuRequest) (httpStatus int, res
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 	defer resp.Body.Close()
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 	var responseObject PesananItemkuResponse
@@ -157,7 +157,7 @@ func clearString(str string) string {
 }
 
 func cekPesananItemkuService() {
-	fmt.Print("run cekPesananItemkuService")
+	fmt.Println("run cekPesananItemkuService")
 	requestPesanan := PesananItemkuRequest{DateStart: carbon.Yesterday().ToDateString(), OrderStatus: "REQUIRE_PROCESS"}
 	code, _, err := hitItemkuOrderList(requestPesanan)
 	if err != nil || code != 200 {
