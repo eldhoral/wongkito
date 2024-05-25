@@ -8,7 +8,7 @@ COPY . .
 
 RUN go mod tidy
 
-EXPOSE 8090
+EXPOSE 8040
 
 RUN go build -o binary
 

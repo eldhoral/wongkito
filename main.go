@@ -121,7 +121,7 @@ func main() {
 
 	fmt.Println("API jalan")
 	// Start server
-	log.Fatal(http.ListenAndServe(":8090", r))
+	log.Fatal(http.ListenAndServe(":8040", r))
 
 }
 
