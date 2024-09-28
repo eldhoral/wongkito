@@ -101,8 +101,6 @@ func main() {
 	//	panic(err)
 	//}
 
-	startScheduler()
-
 	Wr = wiringRepository(nil)
 	fmt.Println("mulai")
 
