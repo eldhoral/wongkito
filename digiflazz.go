@@ -213,7 +213,7 @@ func pembayaranDigiflazz(order Order) (code int, response ResponseDigiflazz, err
 	}
 	order.Username = "hubugeo6zxQo"
 	order.RefId = "manual-" + order.BuyerSkuCode + "-" + carbon.Now().ToDateMicroString()
-	sign := "hubugeo6zxQoa2c8d3e0-1960-5653-8fc1-669f53cca959" + order.RefId
+	sign := "hubugeo6zxQo8ab3cb7a-719c-4d29-b2bd-7e8ff587cf28" + order.RefId
 	data := []byte(sign)
 	order.Sign = fmt.Sprintf("%x", md5.Sum(data))
 	code, response, err = HitDigiflazz(order)
